@@ -296,7 +296,7 @@ def get_statistics():
 
 # ==================== API 路由 - 执行任务 ====================
 
-@app.route('/api/accounts/<int:account_id>/execute', methods=['POST'])
+@app.route('/api/accounts/<int:account_id>/execute', methods=['POST', 'GET'])
 def execute_account(account_id):
     """立即执行单个账号"""
     result = scheduler.execute_account_now(account_id)
@@ -307,7 +307,7 @@ def execute_account(account_id):
         'data': result.get('data')
     })
 
-@app.route('/api/accounts/execute-all', methods=['POST'])
+@app.route('/api/accounts/execute-all', methods=['POST', 'GET'])
 def execute_all_accounts():
     """立即执行所有启用的账号"""
     accounts = Account.query.filter_by(enabled=True).all()
