@@ -403,13 +403,16 @@ def internal_error(error):
 
 # ==================== 启动和关闭 ====================
 
-@app.before_first_request
-def before_first_request():
-    """第一个请求前启动调度器"""
+# 初始化应用
+with app.app_context():
+    db.create_all()
+    init_default_account()
+    
+    # 启动调度器（Render / Gunicorn 兼容）
     if not scheduler.scheduler.running:
         scheduler.start()
-
-# 启动调度器（用于非WSGI环境）
+        
+        启动调度器（用于非WSGI环境）
 if __name__ == '__main__':
     with app.app_context():
         scheduler.start()
