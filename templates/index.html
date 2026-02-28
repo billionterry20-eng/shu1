@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>步数定时任务系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-left: 3px solid #3b82f6;
+        }
+        .status-success { color: #10b981; }
+        .status-failed { color: #ef4444; }
+        .status-pending { color: #f59e0b; }
+        .log-info { border-left: 3px solid #3b82f6; }
+        .log-success { border-left: 3px solid #10b981; }
+        .log-warning { border-left: 3px solid #f59e0b; }
+        .log-error { border-left: 3px solid #ef4444; }
+        .account-card {
+            transition: all 0.3s ease;
+        }
+        .account-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4b5563;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .toggle-slider {
+            background-color: #3b82f6;
+        }
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: #1e293b;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .time-input {
+            background: #374151;
+            border: 1px solid #4b5563;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            width: 60px;
+            text-align: center;
+        }
+        .time-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="text-gray-200">
+    <div class="flex h-screen">
+        <!-- 侧边栏 -->
+        <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+            <div class="p-6 border-b border-gray-800">
+                <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-walking text-blue-500"></i>
+                    步数定时系统
+                </h1>
+                <p class="text-xs text-gray-500 mt-1">每天自动提交步数</p>
+            </div>
+            
+            <nav class="flex-1 py-4">
+                <a href="#" class="nav-item active flex items-center gap-3 px-6 py-3 text-gray-300 hover:bg-gray-800 transition" data-tab="accounts">
+                    <i class="fas fa-users w-5"></i>
+                    <span>账号管理</span>
+                </a>
+                <a href="#" class="nav-item flex items-center gap-3 px-6 py-3 text-gray-300 hover:bg-gray-800 transition" data-tab="records">
+                    <i class="fas fa-history w-5"></i>
+                    <span>提交记录</span>
+                </a>
+                <a href="#" class="nav-item flex items-center gap-3 px-6 py-3 text-gray-300 hover:bg-gray-800 transition" data-tab="test">
+                    <i class="fas fa-vial w-5"></i>
+                    <span>测试账号</span>
+                </a>
+                <a href="#" class="nav-item flex items-center gap-3 px-6 py-3 text-gray-300 hover:bg-gray-800 transition" data-tab="logs">
+                    <i class="fas fa-file-alt w-5"></i>
+                    <span>系统日志</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-gray-800">
+                <div class="glass-card rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-400">调度器状态</span>
+                        <span id="scheduler-status" class="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">
+                            <i class="fas fa-circle text-xs mr-1"></i>运行中
+                        </span>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        北京时间: <span id="beijing-time">--:--:--</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 主内容区 -->
+        <main class="flex-1 overflow-auto">
+            <!-- 顶部统计栏 -->
+            <div class="grid grid-cols-4 gap-4 p-6">
+                <div class="glass-card rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">总账号数</p>
+                            <p id="stat-total-accounts" class="text-2xl font-bold text-white">0</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                            <i class="fas fa-users text-blue-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-card rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">已启用</p>
+                            <p id="stat-enabled-accounts" class="text-2xl font-bold text-green-400">0</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg bg-green-500/20 flex items-center justify-center">
+                            <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-card rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">今日成功</p>
+                            <p id="stat-today-success" class="text-2xl font-bold text-emerald-400">0</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                            <i class="fas fa-trophy text-emerald-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-card rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">今日失败</p>
+                            <p id="stat-today-failed" class="text-2xl font-bold text-red-400">0</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-lg bg-red-500/20 flex items-center justify-center">
+                            <i class="fas fa-exclamation-triangle text-red-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 账号管理页面 -->
+            <div id="tab-accounts" class="tab-content active px-6 pb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">账号列表</h2>
+                    <div class="flex gap-2">
+                        <button onclick="executeAllAccounts()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm transition">
+                            <i class="fas fa-play mr-2"></i>全部执行
+                        </button>
+                        <button onclick="openAddModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition">
+                            <i class="fas fa-plus mr-2"></i>添加账号
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="accounts-list" class="grid gap-4">
+                    <!-- 账号卡片将在这里动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 提交记录页面 -->
+            <div id="tab-records" class="tab-content px-6 pb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">提交记录</h2>
+                    <div class="flex gap-2">
+                        <button onclick="loadRecords('today')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">今日</button>
+                        <button onclick="loadRecords('all')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">全部</button>
+                    </div>
+                </div>
+                
+                <div class="glass-card rounded-xl overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-800">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-400">账号</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-400">步数</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-400">状态</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-400">消息</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-400">提交时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="records-list">
+                            <!-- 记录将在这里动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 测试账号页面 -->
+            <div id="tab-test" class="tab-content px-6 pb-6">
+                <div class="max-w-2xl">
+                    <h2 class="text-xl font-bold mb-4">测试账号</h2>
+                    <p class="text-gray-400 mb-6">测试账号是否可以正常提交步数（不会保存到数据库）</p>
+                    
+                    <div class="glass-card rounded-xl p-6">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-2">账号</label>
+                                <input type="text" id="test-account" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="请输入账号">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-2">密码</label>
+                                <input type="password" id="test-password" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="请输入密码">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-2">步数</label>
+                                <input type="number" id="test-steps" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" value="89888">
+                            </div>
+                            <button onclick="testAccount()" class="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition">
+                                <i class="fas fa-vial mr-2"></i>测试提交
+                            </button>
+                        </div>
+                        
+                        <div id="test-result" class="mt-4 hidden">
+                            <!-- 测试结果将在这里显示 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 系统日志页面 -->
+            <div id="tab-logs" class="tab-content px-6 pb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">系统日志</h2>
+                    <button onclick="loadLogs()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">
+                        <i class="fas fa-sync-alt mr-1"></i>刷新
+                    </button>
+                </div>
+                
+                <div id="logs-list" class="space-y-2">
+                    <!-- 日志将在这里动态生成 -->
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- 添加/编辑账号模态框 -->
+    <div id="account-modal" class="modal">
+        <div class="modal-content">
+            <div class="p-6 border-b border-gray-700">
+                <h3 id="modal-title" class="text-lg font-bold">添加账号</h3>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="edit-account-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">账号</label>
+                    <input type="text" id="modal-account" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="请输入账号">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">密码</label>
+                    <input type="password" id="modal-password" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="请输入密码">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">目标步数</label>
+                    <input type="number" id="modal-steps" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" value="89888">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">定时时间（北京时间）</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="modal-hour" class="time-input" value="0" min="0" max="23">
+                        <span class="text-xl">:</span>
+                        <input type="number" id="modal-minute" class="time-input" value="5" min="0" max="59">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">每天在这个时间自动提交步数</p>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-700 flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition">取消</button>
+                <button onclick="saveAccount()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast 提示 -->
+    <div id="toast" class="fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
