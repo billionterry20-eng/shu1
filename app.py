@@ -412,7 +412,7 @@ with app.app_context():
     if not scheduler.scheduler.running:
         scheduler.start()
         
-        启动调度器（用于非WSGI环境）
+       # 启动调度器（用于非WSGI环境）
 if __name__ == '__main__':
     with app.app_context():
         scheduler.start()
