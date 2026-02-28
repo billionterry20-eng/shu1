@@ -296,7 +296,7 @@ def get_statistics():
 
 # ==================== API 路由 - 执行任务 ====================
 
-@app.route('/api/accounts/<int:account_id>/execute', methods=['POST', 'GET'])
+@app.route('/api/accounts/<int:account_id>/execute', methods=['POST'])
 def execute_account(account_id):
     """立即执行单个账号"""
     result = scheduler.execute_account_now(account_id)
@@ -307,7 +307,7 @@ def execute_account(account_id):
         'data': result.get('data')
     })
 
-@app.route('/api/accounts/execute-all', methods=['POST', 'GET'])
+@app.route('/api/accounts/execute-all', methods=['POST'])
 def execute_all_accounts():
     """立即执行所有启用的账号"""
     accounts = Account.query.filter_by(enabled=True).all()
@@ -414,10 +414,10 @@ with app.app_context():
         
        # 启动调度器（用于非WSGI环境）
 if __name__ == '__main__':
-    with app.app_context():
-        scheduler.start()
-    
+    # 本地直接运行（Render/Gunicorn 会导入 app:app，不会走到这里）
     try:
         app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
     finally:
-        scheduler.shutdown()
+        # 优雅关闭调度器
+        if scheduler.scheduler.running:
+            scheduler.shutdown()
